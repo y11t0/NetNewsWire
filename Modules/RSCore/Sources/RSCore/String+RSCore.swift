@@ -134,18 +134,39 @@ public extension String {
 		return false
 	}
 
+	/// Returns `true` if the string has no plain spaces, or if every plain space comes after the host.
+	private var spacesAreAfterHost: Bool {
+		guard let firstSpace = self.firstIndex(of: " ") else { return true }
+
+		var hostStart = self.startIndex
+		while let schemeEnd = self.range(of: "://", range: hostStart..<firstSpace)?.upperBound {
+			hostStart = schemeEnd
+		}
+
+		guard let hostEnd = self[hostStart...].firstIndex(where: { $0 == "/" || $0 == "?" || $0 == "#" }) else { return false }
+		return hostEnd < firstSpace
+	}
+
 	/// Returns `true` if the string may be a URL.
 	var mayBeURL: Bool {
 
 		let s = self.trimmingWhitespace
 
-		if s.isEmpty || (!s.contains(".") && !s.mayBeIPv6URL && !s.hostMayBeLocalhost) {
+		if s.isEmpty || (!s.contains(".") && !s.mayBeIPv6URL && !s.replacingOccurrences(of: " ", with: "%20").hostMayBeLocalhost) {
 			return false
 		}
 
-		let banned = CharacterSet.whitespacesAndNewlines.union(.controlCharacters).union(.illegalCharacters)
+		// A plain space is allowed after the host; other whitespace never is.
+		var banned = CharacterSet.whitespacesAndNewlines
+		banned.remove(" ")
+		banned.formUnion(.controlCharacters)
+		banned.formUnion(.illegalCharacters)
 
 		if s.containsAnyCharacter(from: banned) {
+			return false
+		}
+
+		if !s.spacesAreAfterHost {
 			return false
 		}
 
@@ -173,7 +194,7 @@ public extension String {
 			static let https = "https"
 		}
 
-		var s = self.trimmingWhitespace
+		var s = self.trimmingWhitespace.replacingOccurrences(of: " ", with: "%20")
 		var wasFeeds = false
 
 		var lowercaseS = s.lowercased()
