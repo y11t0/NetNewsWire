@@ -134,7 +134,26 @@ public extension String {
 		return false
 	}
 
+	/// Returns `true` if every space in the string comes after the host —
+	/// in the path, query, or fragment — so that a sentence isn’t taken for a URL.
+	private var spacesAreAfterHost: Bool {
+		guard self.contains(" ") else {
+			return true
+		}
+
+		let schemeless = self.stripping(prefix: "feeds:").stripping(prefix: "feed:").stripping(prefix: "//").strippingHTTPOrHTTPSScheme
+		guard let hostEnd = schemeless.firstIndex(where: { $0 == "/" || $0 == "?" || $0 == "#" }) else {
+			return false
+		}
+
+		let host = schemeless[..<hostEnd]
+		return !host.isEmpty && !host.contains(" ")
+	}
+
 	/// Returns `true` if the string may be a URL.
+	///
+	/// Plain spaces are allowed after the host, as in `https://example.com/my feed.xml`,
+	/// since `normalizedURL` percent-encodes them.
 	var mayBeURL: Bool {
 
 		let s = self.trimmingWhitespace
@@ -143,9 +162,10 @@ public extension String {
 			return false
 		}
 
-		let banned = CharacterSet.whitespacesAndNewlines.union(.controlCharacters).union(.illegalCharacters)
+		// Plain spaces are checked separately below; tabs, newlines, and other whitespace are never allowed.
+		let banned = CharacterSet.whitespacesAndNewlines.subtracting(CharacterSet(charactersIn: " ")).union(.controlCharacters).union(.illegalCharacters)
 
-		if s.containsAnyCharacter(from: banned) {
+		if s.containsAnyCharacter(from: banned) || !s.spacesAreAfterHost {
 			return false
 		}
 
@@ -174,6 +194,11 @@ public extension String {
 		}
 
 		var s = self.trimmingWhitespace
+
+		// Percent-encode interior spaces, so that a URL typed or pasted
+		// with a literal space (as in https://example.com/my feed.xml) works.
+		s = s.replacingOccurrences(of: " ", with: "%20")
+
 		var wasFeeds = false
 
 		var lowercaseS = s.lowercased()

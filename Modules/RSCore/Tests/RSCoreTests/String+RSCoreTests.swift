@@ -136,6 +136,32 @@ final class StringRSCoreTests: XCTestCase {
 
 	}
 
+	func testMayBeURL() {
+
+		XCTAssertTrue("https://example.com/feed.xml".mayBeURL)
+		XCTAssertTrue("example.com".mayBeURL)
+		XCTAssertFalse("".mayBeURL)
+
+		// Unencoded spaces after the host
+		XCTAssertTrue("https://example.com/my feed.xml".mayBeURL)
+		XCTAssertTrue("example.com/podcasts/my feed.rss".mayBeURL)
+		XCTAssertTrue("feed:https://example.com/a b".mayBeURL)
+		XCTAssertTrue("https://example.com/feed?q=a b".mayBeURL)
+		XCTAssertTrue("  https://example.com/my feed.xml  ".mayBeURL)
+
+		// Encoded spaces
+		XCTAssertTrue("https://example.com/my%20feed.xml".mayBeURL)
+
+		// Tabs, newlines, and spaces in the host are rejected
+		XCTAssertFalse("https://example.com/my\tfeed.xml".mayBeURL)
+		XCTAssertFalse("https://example.com/my\nfeed.xml".mayBeURL)
+		XCTAssertFalse("https://exam ple.com/feed".mayBeURL)
+
+		// Sentences are not URLs
+		XCTAssertFalse("This is a sentence. It has a period.".mayBeURL)
+		XCTAssertFalse("Go to example.com/feed now".mayBeURL)
+	}
+
 	func testNormalizedURL() {
 
 		// feeds:
@@ -166,6 +192,12 @@ final class StringRSCoreTests: XCTestCase {
 		// bare
 		let http = "http://daringfireball.net/"
 		XCTAssertEqual(http.normalizedURL, "http://daringfireball.net/")
+
+		// spaces
+		XCTAssertEqual("https://example.com/my feed.xml".normalizedURL, "https://example.com/my%20feed.xml")
+		XCTAssertEqual("  example.com/a b c.rss  ".normalizedURL, "http://example.com/a%20b%20c.rss")
+		XCTAssertEqual("feeds:example.com/my feed".normalizedURL, "https://example.com/my%20feed")
+		XCTAssertEqual("https://example.com/my%20feed.xml".normalizedURL, "https://example.com/my%20feed.xml")
 
 	}
 
