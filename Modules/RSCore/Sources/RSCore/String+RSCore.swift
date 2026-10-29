@@ -134,16 +134,38 @@ public extension String {
 		return false
 	}
 
+	/// Returns `true` if a space appears in the host portion of the string — before any
+	/// path, query, or fragment. Spaces after the host can be percent-encoded into a valid
+	/// URL; a space in the host means the string is more likely a sentence than a URL.
+	private var hasSpaceInHost: Bool {
+		let pathDelimiters: Set<Character> = ["/", "?", "#"]
+		var rest = Substring(self)
+		if let schemeEnd = rest.range(of: "://"), !rest[..<schemeEnd.lowerBound].contains(where: { pathDelimiters.contains($0) }) {
+			rest = rest[schemeEnd.upperBound...]
+		}
+		let host = rest.prefix { !pathDelimiters.contains($0) }
+		return host.contains(" ")
+	}
+
 	/// Returns `true` if the string may be a URL.
+	///
+	/// Spaces after the host are allowed — `normalizedURL` percent-encodes them.
+	/// Tabs, newlines, and other control characters are not.
 	var mayBeURL: Bool {
 
 		let s = self.trimmingWhitespace
 
-		if s.isEmpty || (!s.contains(".") && !s.mayBeIPv6URL && !s.hostMayBeLocalhost) {
+		if s.isEmpty || s.hasSpaceInHost {
 			return false
 		}
 
-		let banned = CharacterSet.whitespacesAndNewlines.union(.controlCharacters).union(.illegalCharacters)
+		let encoded = s.replacingOccurrences(of: " ", with: "%20")
+		if !encoded.contains(".") && !encoded.mayBeIPv6URL && !encoded.hostMayBeLocalhost {
+			return false
+		}
+
+		var banned = CharacterSet.whitespacesAndNewlines.union(.controlCharacters).union(.illegalCharacters)
+		banned.remove(charactersIn: " ")
 
 		if s.containsAnyCharacter(from: banned) {
 			return false
@@ -159,6 +181,7 @@ public extension String {
 	/// 1) Note whether or not this is a feed: or feeds: or other prefix
 	/// 2) Strip the feed: or feeds: prefix
 	/// 3) If the resulting string is not prefixed with http: or https:, then add http:// as a prefix
+	/// 4) Percent-encode any remaining spaces as %20
 	///
 	/// - Note: Must handle edge case (like boingboing.net) where the feed URL is
 	/// feed:http://boingboing.net/feed
@@ -205,7 +228,7 @@ public extension String {
 			s = s.appending("/")
 		}
 
-		return s
+		return s.replacingOccurrences(of: " ", with: "%20")
 	}
 
 	/// Removes a prefix from the beginning of a string.
