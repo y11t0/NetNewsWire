@@ -169,6 +169,65 @@ final class StringRSCoreTests: XCTestCase {
 
 	}
 
+	func testNormalizedURLEncodesInteriorSpaces() {
+
+		let withScheme = "https://example.com/my feed.xml"
+		XCTAssertEqual(withScheme.normalizedURL, "https://example.com/my%20feed.xml")
+
+		let schemeless = "example.com/my feed.xml"
+		XCTAssertEqual(schemeless.normalizedURL, "http://example.com/my%20feed.xml")
+
+		let feed = "feed:example.com/my feed.xml"
+		XCTAssertEqual(feed.normalizedURL, "http://example.com/my%20feed.xml")
+
+		let surroundingWhitespace = "  https://example.com/my feed.xml \n"
+		XCTAssertEqual(surroundingWhitespace.normalizedURL, "https://example.com/my%20feed.xml")
+
+		let alreadyEncoded = "https://example.com/my%20feed.xml"
+		XCTAssertEqual(alreadyEncoded.normalizedURL, "https://example.com/my%20feed.xml")
+
+	}
+
+	func testMayBeURLAllowsInteriorSpacesAfterHost() {
+
+		XCTAssertTrue("https://example.com/my feed.xml".mayBeURL)
+		XCTAssertTrue("example.com/my feed.xml".mayBeURL)
+		XCTAssertTrue("https://example.com/feed?title=my feed".mayBeURL)
+		XCTAssertTrue("http://localhost:8080/my feed.xml".mayBeURL)
+		XCTAssertTrue("  https://example.com/my feed.xml  ".mayBeURL)
+		XCTAssertTrue("localhost/my feed".mayBeURL)
+		XCTAssertTrue("localhost:8080/my feed.xml".mayBeURL)
+		XCTAssertTrue("[::1]:8080/my feed".mayBeURL)
+		XCTAssertTrue("192.168.1.1/my feed".mayBeURL)
+
+	}
+
+	func testMayBeURLRejectsSpacesInHost() {
+
+		XCTAssertFalse("example .com/feed".mayBeURL)
+		XCTAssertFalse("https://exa mple.com/feed".mayBeURL)
+		XCTAssertFalse("Visit example.com today".mayBeURL)
+
+	}
+
+	func testMayBeURLRejectsSentencesContainingURLCharacters() {
+
+		XCTAssertFalse("Input/output errors are common.".mayBeURL)
+		XCTAssertFalse("Input?output errors are common.".mayBeURL)
+		XCTAssertFalse("Input#output errors are common.".mayBeURL)
+		XCTAssertFalse("Why? Because it is.".mayBeURL)
+		XCTAssertFalse("Input/output errors are common".mayBeURL)
+
+	}
+
+	func testMayBeURLRejectsTabsNewlinesAndControlCharacters() {
+
+		XCTAssertFalse("https://example.com/my\tfeed.xml".mayBeURL)
+		XCTAssertFalse("https://example.com/my\nfeed.xml".mayBeURL)
+		XCTAssertFalse("https://example.com/my\u{0}feed.xml".mayBeURL)
+
+	}
+
 	func testMD5StringPerformance() {
 
 		let s1 = "These are the times that try men’s souls."

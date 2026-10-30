@@ -134,18 +134,51 @@ public extension String {
 		return false
 	}
 
+	/// The string with spaces percent-encoded as `%20`.
+	private var percentEncodingSpaces: String {
+		self.replacingOccurrences(of: " ", with: "%20")
+	}
+
+	/// Returns `true` if a host portion looks like a real host: it contains a dot,
+	/// is an IPv6 address, or is `localhost` (with an optional port).
+	private var looksLikeHost: Bool {
+		self.contains(".") || self.mayBeIPv6URL || self.split(separator: ":", omittingEmptySubsequences: false).first == "localhost"
+	}
+
+	/// The host portion of a URL-like string: what follows the scheme (if any)
+	/// and precedes the first "/", "?", or "#".
+	private var hostPortion: Substring {
+		let terminators: Set<Character> = ["/", "?", "#"]
+		var rest = self[...]
+		if let schemeRange = rest.range(of: "://"), !rest[..<schemeRange.lowerBound].contains(where: { terminators.contains($0) }) {
+			rest = rest[schemeRange.upperBound...]
+		}
+		let end = rest.firstIndex(where: { terminators.contains($0) }) ?? rest.endIndex
+		return rest[..<end]
+	}
+
 	/// Returns `true` if the string may be a URL.
+	///
+	/// Spaces are allowed after the host (`normalizedURL` encodes them);
+	/// tabs, newlines, and control characters are not. A string with spaces must
+	/// also have a host-like host portion, so a sentence that happens to contain
+	/// a slash ("Input/output errors are common.") isn't taken for a URL.
 	var mayBeURL: Bool {
 
 		let s = self.trimmingWhitespace
 
-		if s.isEmpty || (!s.contains(".") && !s.mayBeIPv6URL && !s.hostMayBeLocalhost) {
+		if s.isEmpty || (!s.contains(".") && !s.mayBeIPv6URL && !s.percentEncodingSpaces.hostMayBeLocalhost) {
 			return false
 		}
 
-		let banned = CharacterSet.whitespacesAndNewlines.union(.controlCharacters).union(.illegalCharacters)
+		var banned = CharacterSet.whitespacesAndNewlines.union(.controlCharacters).union(.illegalCharacters)
+		banned.remove(charactersIn: " ")
 
 		if s.containsAnyCharacter(from: banned) {
+			return false
+		}
+
+		if s.hostPortion.contains(" ") || (s.contains(" ") && !String(s.hostPortion).looksLikeHost) {
 			return false
 		}
 
@@ -173,7 +206,8 @@ public extension String {
 			static let https = "https"
 		}
 
-		var s = self.trimmingWhitespace
+		// Interior spaces are encoded so the result is a valid URL string.
+		var s = self.trimmingWhitespace.percentEncodingSpaces
 		var wasFeeds = false
 
 		var lowercaseS = s.lowercased()
