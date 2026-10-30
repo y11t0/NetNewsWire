@@ -195,6 +195,10 @@ final class StringRSCoreTests: XCTestCase {
 		XCTAssertTrue("https://example.com/feed?title=my feed".mayBeURL)
 		XCTAssertTrue("http://localhost:8080/my feed.xml".mayBeURL)
 		XCTAssertTrue("  https://example.com/my feed.xml  ".mayBeURL)
+		XCTAssertTrue("localhost/my feed".mayBeURL)
+		XCTAssertTrue("localhost:8080/my feed.xml".mayBeURL)
+		XCTAssertTrue("[::1]:8080/my feed".mayBeURL)
+		XCTAssertTrue("192.168.1.1/my feed".mayBeURL)
 
 	}
 
@@ -203,6 +207,16 @@ final class StringRSCoreTests: XCTestCase {
 		XCTAssertFalse("example .com/feed".mayBeURL)
 		XCTAssertFalse("https://exa mple.com/feed".mayBeURL)
 		XCTAssertFalse("Visit example.com today".mayBeURL)
+
+	}
+
+	func testMayBeURLRejectsSentencesContainingURLCharacters() {
+
+		XCTAssertFalse("Input/output errors are common.".mayBeURL)
+		XCTAssertFalse("Input?output errors are common.".mayBeURL)
+		XCTAssertFalse("Input#output errors are common.".mayBeURL)
+		XCTAssertFalse("Why? Because it is.".mayBeURL)
+		XCTAssertFalse("Input/output errors are common".mayBeURL)
 
 	}
 
