@@ -169,6 +169,38 @@ final class StringRSCoreTests: XCTestCase {
 
 	}
 
+	func testMayBeURLAllowsSpacesAfterHost() {
+
+		XCTAssertTrue("https://example.com/my feed.xml".mayBeURL)
+		XCTAssertTrue("example.com/my feed.xml".mayBeURL)
+		XCTAssertTrue("  https://example.com/my feed.xml  ".mayBeURL)
+		XCTAssertTrue("https://example.com/feed?name=my feed".mayBeURL)
+		XCTAssertTrue("feed:https://example.com/my feed.xml".mayBeURL)
+		XCTAssertTrue("localhost/my feed".mayBeURL)
+		XCTAssertTrue("https://example.com/my%20feed.xml".mayBeURL)
+	}
+
+	func testMayBeURLRejectsSpacesInHostAndOtherWhitespace() {
+
+		XCTAssertFalse("example .com/feed".mayBeURL)
+		XCTAssertFalse("https://exa mple.com/feed".mayBeURL)
+		XCTAssertFalse("This is a sentence. It has a period.".mayBeURL)
+		XCTAssertFalse("see https://example.com/feed".mayBeURL)
+		XCTAssertFalse("https://example.com/my\tfeed.xml".mayBeURL)
+		XCTAssertFalse("https://example.com/my feed\t.xml".mayBeURL)
+		XCTAssertFalse("https://example.com/my\nfeed.xml".mayBeURL)
+		XCTAssertFalse("https://example.com/my\u{0}feed.xml".mayBeURL)
+	}
+
+	func testNormalizedURLEncodesSpaces() {
+
+		XCTAssertEqual("https://example.com/my feed.xml".normalizedURL, "https://example.com/my%20feed.xml")
+		XCTAssertEqual("example.com/my feed.xml".normalizedURL, "http://example.com/my%20feed.xml")
+		XCTAssertEqual("feed:https://example.com/a b/c d".normalizedURL, "https://example.com/a%20b/c%20d")
+		XCTAssertEqual("  https://example.com/my feed.xml  ".normalizedURL, "https://example.com/my%20feed.xml")
+		XCTAssertEqual("https://example.com/my%20feed.xml".normalizedURL, "https://example.com/my%20feed.xml")
+	}
+
 	func testMD5StringPerformance() {
 
 		let s1 = "These are the times that try men’s souls."

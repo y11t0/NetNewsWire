@@ -116,6 +116,31 @@ public extension String {
 		return self.rangeOfCharacter(from: charset) != nil
 	}
 
+	/// A copy of the string with each space replaced by `%20`.
+	private var percentEncodingSpaces: String {
+		self.replacingOccurrences(of: " ", with: "%20")
+	}
+
+	/// Returns `true` if the string has no spaces, or if every space comes after the host —
+	/// that is, after the first `/`, `?`, or `#` that follows any `feed:` prefix and scheme.
+	private var spacesAreAfterHost: Bool {
+		guard let firstSpace = self.firstIndex(of: " ") else {
+			return true
+		}
+
+		// Skip a prefix like "feed:https://" so its slashes aren't taken for the end of the host.
+		var hostStart = self.startIndex
+		if let prefixRange = self.range(of: "^(feeds?:)?(//)?([a-z][a-z0-9+.-]*://)?", options: [.regularExpression, .caseInsensitive]) {
+			hostStart = prefixRange.upperBound
+		}
+
+		guard let hostEnd = self[hostStart...].firstIndex(where: { $0 == "/" || $0 == "?" || $0 == "#" }) else {
+			return false
+		}
+
+		return hostEnd < firstSpace
+	}
+
 	/// Returns `true` if a string may be an IPv6 URL.
 	private var mayBeIPv6URL: Bool {
 		self.range(of: "\\[[0-9a-fA-F:]+\\]", options: .regularExpression) != nil
@@ -139,11 +164,17 @@ public extension String {
 
 		let s = self.trimmingWhitespace
 
-		if s.isEmpty || (!s.contains(".") && !s.mayBeIPv6URL && !s.hostMayBeLocalhost) {
+		if s.isEmpty || (!s.contains(".") && !s.mayBeIPv6URL && !s.percentEncodingSpaces.hostMayBeLocalhost) {
 			return false
 		}
 
-		let banned = CharacterSet.whitespacesAndNewlines.union(.controlCharacters).union(.illegalCharacters)
+		// Spaces after the host are okay — normalizedURL encodes them. Tabs, newlines, and control characters are not.
+		guard s.spacesAreAfterHost else {
+			return false
+		}
+
+		var banned = CharacterSet.whitespacesAndNewlines.union(.controlCharacters).union(.illegalCharacters)
+		banned.remove(charactersIn: " ")
 
 		if s.containsAnyCharacter(from: banned) {
 			return false
@@ -159,6 +190,7 @@ public extension String {
 	/// 1) Note whether or not this is a feed: or feeds: or other prefix
 	/// 2) Strip the feed: or feeds: prefix
 	/// 3) If the resulting string is not prefixed with http: or https:, then add http:// as a prefix
+	/// 4) Spaces are percent-encoded as %20
 	///
 	/// - Note: Must handle edge case (like boingboing.net) where the feed URL is
 	/// feed:http://boingboing.net/feed
@@ -173,7 +205,7 @@ public extension String {
 			static let https = "https"
 		}
 
-		var s = self.trimmingWhitespace
+		var s = self.trimmingWhitespace.percentEncodingSpaces
 		var wasFeeds = false
 
 		var lowercaseS = s.lowercased()
